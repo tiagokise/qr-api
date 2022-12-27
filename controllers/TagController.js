@@ -1,4 +1,4 @@
-const Book = require("../models/BookModel");
+const Tag = require("../models/TagModel");
 const { body,validationResult } = require("express-validator");
 const { sanitizeBody } = require("express-validator");
 const apiResponse = require("../helpers/apiResponse");
@@ -6,31 +6,32 @@ const auth = require("../middlewares/jwt");
 var mongoose = require("mongoose");
 mongoose.set("useFindAndModify", false);
 
-// Book Schema
-function BookData(data) {
+// Tag Schema
+function TagData(data) {
 	this.id = data._id;
-	this.title= data.title;
+	this.name= data.name;
 	this.description = data.description;
-	this.isbn = data.isbn;
+	this.qrcode = data.qrcode;
 	this.createdAt = data.createdAt;
 }
 
 /**
- * Book List.
+ * Tag List.
  * 
- * @returns {Object}
+ * @returns { Object }
  */
-exports.bookList = [
-	auth,
+exports.tagList = [
+	// auth,
 	function (req, res) {
 		try {
-			Book.find({user: req.user._id},"_id title description isbn createdAt").then((books)=>{
-				if(books.length > 0){
-					return apiResponse.successResponseWithData(res, "Operation success", books);
-				}else{
-					return apiResponse.successResponseWithData(res, "Operation success", []);
-				}
-			});
+			Tag.find({user: req.user._id},"_id title description isbn createdAt")
+				.then((books)=>{
+					if(books.length > 0){
+						return apiResponse.successResponseWithData(res, "Operation success", books);
+					}else{
+						return apiResponse.successResponseWithData(res, "Operation success", []);
+					}
+				});
 		} catch (err) {
 			//throw error in json response with status 500. 
 			return apiResponse.ErrorResponse(res, err);
@@ -39,22 +40,22 @@ exports.bookList = [
 ];
 
 /**
- * Book Detail.
+ * Tag Detail.
  * 
  * @param {string}      id
  * 
  * @returns {Object}
  */
-exports.bookDetail = [
+exports.tagDetail = [
 	auth,
 	function (req, res) {
 		if(!mongoose.Types.ObjectId.isValid(req.params.id)){
 			return apiResponse.successResponseWithData(res, "Operation success", {});
 		}
 		try {
-			Book.findOne({_id: req.params.id,user: req.user._id},"_id title description isbn createdAt").then((book)=>{                
+			Tag.findOne({_id: req.params.id,user: req.user._id},"_id title description isbn createdAt").then((book)=>{                
 				if(book !== null){
-					let bookData = new BookData(book);
+					let bookData = new TagData(book);
 					return apiResponse.successResponseWithData(res, "Operation success", bookData);
 				}else{
 					return apiResponse.successResponseWithData(res, "Operation success", {});
@@ -68,7 +69,7 @@ exports.bookDetail = [
 ];
 
 /**
- * Book store.
+ * Tag store.
  * 
  * @param {string}      title 
  * @param {string}      description
@@ -76,14 +77,14 @@ exports.bookDetail = [
  * 
  * @returns {Object}
  */
-exports.bookStore = [
+exports.tagStore = [
 	auth,
 	body("title", "Title must not be empty.").isLength({ min: 1 }).trim(),
 	body("description", "Description must not be empty.").isLength({ min: 1 }).trim(),
 	body("isbn", "ISBN must not be empty").isLength({ min: 1 }).trim().custom((value,{req}) => {
-		return Book.findOne({isbn : value,user: req.user._id}).then(book => {
+		return Tag.findOne({isbn : value,user: req.user._id}).then(book => {
 			if (book) {
-				return Promise.reject("Book already exist with this ISBN no.");
+				return Promise.reject("Tag already exist with this ISBN no.");
 			}
 		});
 	}),
@@ -91,7 +92,7 @@ exports.bookStore = [
 	(req, res) => {
 		try {
 			const errors = validationResult(req);
-			var book = new Book(
+			var book = new Tag(
 				{ title: req.body.title,
 					user: req.user,
 					description: req.body.description,
@@ -105,8 +106,8 @@ exports.bookStore = [
 				//Save book.
 				book.save(function (err) {
 					if (err) { return apiResponse.ErrorResponse(res, err); }
-					let bookData = new BookData(book);
-					return apiResponse.successResponseWithData(res,"Book add Success.", bookData);
+					let bookData = new TagData(book);
+					return apiResponse.successResponseWithData(res,"Tag add Success.", bookData);
 				});
 			}
 		} catch (err) {
@@ -117,7 +118,7 @@ exports.bookStore = [
 ];
 
 /**
- * Book update.
+ * Tag update.
  * 
  * @param {string}      title 
  * @param {string}      description
@@ -125,14 +126,14 @@ exports.bookStore = [
  * 
  * @returns {Object}
  */
-exports.bookUpdate = [
+exports.tagUpdate = [
 	auth,
 	body("title", "Title must not be empty.").isLength({ min: 1 }).trim(),
 	body("description", "Description must not be empty.").isLength({ min: 1 }).trim(),
 	body("isbn", "ISBN must not be empty").isLength({ min: 1 }).trim().custom((value,{req}) => {
-		return Book.findOne({isbn : value,user: req.user._id, _id: { "$ne": req.params.id }}).then(book => {
+		return Tag.findOne({isbn : value,user: req.user._id, _id: { "$ne": req.params.id }}).then(book => {
 			if (book) {
-				return Promise.reject("Book already exist with this ISBN no.");
+				return Promise.reject("Tag already exist with this ISBN no.");
 			}
 		});
 	}),
@@ -140,7 +141,7 @@ exports.bookUpdate = [
 	(req, res) => {
 		try {
 			const errors = validationResult(req);
-			var book = new Book(
+			var book = new Tag(
 				{ title: req.body.title,
 					description: req.body.description,
 					isbn: req.body.isbn,
@@ -154,21 +155,21 @@ exports.bookUpdate = [
 				if(!mongoose.Types.ObjectId.isValid(req.params.id)){
 					return apiResponse.validationErrorWithData(res, "Invalid Error.", "Invalid ID");
 				}else{
-					Book.findById(req.params.id, function (err, foundBook) {
+					Tag.findById(req.params.id, function (err, foundBook) {
 						if(foundBook === null){
-							return apiResponse.notFoundResponse(res,"Book not exists with this id");
+							return apiResponse.notFoundResponse(res,"Tag not exists with this id");
 						}else{
 							//Check authorized user
 							if(foundBook.user.toString() !== req.user._id){
 								return apiResponse.unauthorizedResponse(res, "You are not authorized to do this operation.");
 							}else{
 								//update book.
-								Book.findByIdAndUpdate(req.params.id, book, {},function (err) {
+								Tag.findByIdAndUpdate(req.params.id, book, {},function (err) {
 									if (err) { 
 										return apiResponse.ErrorResponse(res, err); 
 									}else{
-										let bookData = new BookData(book);
-										return apiResponse.successResponseWithData(res,"Book update Success.", bookData);
+										let bookData = new TagData(book);
+										return apiResponse.successResponseWithData(res,"Tag update Success.", bookData);
 									}
 								});
 							}
@@ -184,33 +185,33 @@ exports.bookUpdate = [
 ];
 
 /**
- * Book Delete.
+ * Tag Delete.
  * 
  * @param {string}      id
  * 
  * @returns {Object}
  */
-exports.bookDelete = [
+exports.tagDelete = [
 	auth,
 	function (req, res) {
 		if(!mongoose.Types.ObjectId.isValid(req.params.id)){
 			return apiResponse.validationErrorWithData(res, "Invalid Error.", "Invalid ID");
 		}
 		try {
-			Book.findById(req.params.id, function (err, foundBook) {
+			Tag.findById(req.params.id, function (err, foundBook) {
 				if(foundBook === null){
-					return apiResponse.notFoundResponse(res,"Book not exists with this id");
+					return apiResponse.notFoundResponse(res,"Tag not exists with this id");
 				}else{
 					//Check authorized user
 					if(foundBook.user.toString() !== req.user._id){
 						return apiResponse.unauthorizedResponse(res, "You are not authorized to do this operation.");
 					}else{
 						//delete book.
-						Book.findByIdAndRemove(req.params.id,function (err) {
+						Tag.findByIdAndRemove(req.params.id,function (err) {
 							if (err) { 
 								return apiResponse.ErrorResponse(res, err); 
 							}else{
-								return apiResponse.successResponse(res,"Book delete Success.");
+								return apiResponse.successResponse(res,"Tag delete Success.");
 							}
 						});
 					}

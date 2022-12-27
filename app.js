@@ -4,7 +4,6 @@ var cookieParser = require("cookie-parser");
 var logger = require("morgan");
 require("dotenv").config();
 var indexRouter = require("./routes/index");
-var apiRouter = require("./routes/api");
 var apiResponse = require("./helpers/apiResponse");
 var cors = require("cors");
 
@@ -28,9 +27,7 @@ var db = mongoose.connection;
 var app = express();
 
 //don't show the log when it is test
-if(process.env.NODE_ENV !== "test") {
-	app.use(logger("dev"));
-}
+if(process.env.NODE_ENV !== "test") { app.use(logger("dev")); }
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
@@ -41,17 +38,9 @@ app.use(cors());
 
 //Route Prefixes
 app.use("/", indexRouter);
-app.use("/api/", apiRouter);
 
 // throw 404 if URL not found
-app.all("*", function(req, res) {
-	return apiResponse.notFoundResponse(res, "Page not found");
-});
-
-app.use((err, req, res) => {
-	if(err.name == "UnauthorizedError"){
-		return apiResponse.unauthorizedResponse(res, err.message);
-	}
-});
+app.all("*", (req, res) => apiResponse.notFoundResponse(res, "Page not found"));
+app.use((err, req, res) => err.name == "UnauthorizedError" && apiResponse.unauthorizedResponse(res, err.message));
 
 module.exports = app;
