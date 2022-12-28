@@ -1,7 +1,6 @@
 const UserModel = require("../models/UserModel");
 const { body,validationResult } = require("express-validator");
 const { sanitizeBody } = require("express-validator");
-//helper file to prepare responses.
 const apiResponse = require("../helpers/apiResponse");
 const utility = require("../helpers/utility");
 const bcrypt = require("bcrypt");
@@ -11,29 +10,36 @@ const { constants } = require("../helpers/constants");
 
 /**
  * User registration.
- *
  * @param {string} userFullName
  * @param {string} email
+ * @param {string} phone
  * @param {string} password
- *
+ * 
  * @returns {Object}
  */
+
 exports.register = [
 	body("userFullName")
 		.isLength({ min: 3 }).trim().withMessage("Nome completo é obrigatório."),
 
 	body("email")
 		.isLength({ min: 3 }).trim().withMessage("Email é obrigatório.")
-		.isEmail().withMessage("Por favor insira um email válido.").custom((value) => {
+		.isEmail().withMessage("Por favor insira um email válido.")
+    .custom((value) => {
 			return UserModel.findOne({email : value}).then((user) => {
 				if (user) { return Promise.reject("E-mail já está em uso"); }
 			});
 		}),
 
+  body("phone")
+    .isLength({ min: 11 }).trim().withMessage("Telefone é obrigatório.")
+    .isNumeric().withMessage("Por favor insira um telefone válido."),
+
 	body("password").isLength({ min: 6 }).trim().withMessage("A Senha deve ter no minímo 6 caracteres."),
 
 	sanitizeBody("userFullName").escape(),
 	sanitizeBody("email").escape(),
+	sanitizeBody("phone").escape(),
 	sanitizeBody("password").escape(),
 
 	(req, res) => {
@@ -42,13 +48,19 @@ exports.register = [
 			if (!errors.isEmpty()) { return apiResponse.validationErrorWithData(res, "Validation Error.", errors.array()); }
 			bcrypt.hash(req.body.password, 10, function(err, hash) {
 				let otp = utility.randomNumber(4);
-        var user = new UserModel({ userFullName: req.body.userFullName, email: req.body.email, password: hash, confirmOTP: otp });
-        // let html = "<p>Por favor comfirme seu email.</p><p>Código: "+otp+"</p>";
+        var user = new UserModel({
+          userFullName: req.body.userFullName, 
+          phone: req.body.email, 
+          email: req.body.email, 
+          password: hash, 
+          confirmOTP: otp 
+        });
         user.save(function (err) {
           if (err) { return apiResponse.ErrorResponse(res, err); }
-          let userData = { _id: user._id, firstName: user.firstName, lastName: user.lastName, email: user.email };
+          let userData = { _id: user._id, userFullName: user.userFullName, email: user.email };
           return apiResponse.successResponseWithData(res,"Registration Success.", userData);
         });
+        // let html = "<p>Por favor comfirme seu email.</p><p>Código: "+otp+"</p>";
         // mailer.send(constants.confirmEmails.from, req.body.email, "Confirm Account", html)
         //   .then(() => {
         //   }).catch(err => {
