@@ -18,7 +18,7 @@ const { constants } = require("../helpers/constants");
  * @returns {Object}
  */
 
-exports.signup = [
+exports.signUp = [
 	body("userFullName")
 		.isLength({ min: 3 }).trim().withMessage("Nome completo é obrigatório."),
 
@@ -49,25 +49,15 @@ exports.signup = [
 			if (!errors.isEmpty()) { return apiResponse.validationErrorWithData(res, "Validation Error.", errors.array()); }
 			bcrypt.hash(req.body.password, 10, function(err, hash) {
 				let otp = utility.randomNumber(4);
-        var user = new UserModel({
-          userFullName: req.body.userFullName, 
-          phone: req.body.email, 
-          email: req.body.email, 
-          password: hash, 
-          confirmOTP: otp 
-        });
+        var user = new UserModel({ ...req.body, password: hash, confirmOTP: otp });
         user.save((err) => {
           if (err) { return apiResponse.ErrorResponse(res, err); }
           let userData = { _id: user._id, userFullName: user.userFullName, phone: user.phone, email: user.email };
           return apiResponse.successResponseWithData(res,"Registration Success.", userData);
         });
-        // let html = "<p>Por favor comfirme seu email.</p><p>Código: "+otp+"</p>";
-        // mailer.send(constants.confirmEmails.from, req.body.email, "Confirm Account", html)
-        //   .then(() => {
-        //   }).catch(err => {
-        //     console.log(err);
-        //     return apiResponse.ErrorResponse(res,err);
-        //   });
+        let html = "<p>Por favor comfirme seu email.</p><p>Código: "+otp+"</p>";
+        mailer.send(constants.confirmEmails.from, req.body.email, "Confirmação de conta", html)
+          .catch(err => { console.log(err); return apiResponse.ErrorResponse(res,err); });
       });
     } catch (err) { return apiResponse.ErrorResponse(res, err); }
 	}];
@@ -139,7 +129,7 @@ exports.verifyConfirm = [
 			UserModel.findOne(query).then(user => {
         if(!user) { return apiResponse.unauthorizedResponse(res, "Email não encontrado.") }
 				if(user.isConfirmed){return apiResponse.unauthorizedResponse(res, "Conta já confirmada."); }
-				if(user.confirmOTP !== req.body.otp) { return apiResponse.unauthorizedResponse(res, "Otp does not match"); }
+				if(user.confirmOTP !== req.body.otp) { return apiResponse.unauthorizedResponse(res, "O código não é válido!"); }
 				UserModel.findOneAndUpdate(query, { isConfirmed: true, confirmOTP: null })
           .catch(err => { return apiResponse.ErrorResponse(res, err); });
 				return apiResponse.successResponse(res,"Account confirmed success.");			
