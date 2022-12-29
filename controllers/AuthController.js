@@ -139,54 +139,37 @@ exports.verifyConfirm = [
 
 /**
  * Resend Confirm otp.
- *
  * @param {string}      email
  *
  * @returns {Object}
  */
+
 exports.resendConfirmOtp = [
-	body("email").isLength({ min: 1 }).trim().withMessage("Email must be specified.")
+	body("email")
+    .isLength({ min: 1 }).trim().withMessage("Email must be specified.")
 		.isEmail().withMessage("Email must be a valid email address."),
+
 	sanitizeBody("email").escape(),
+
 	(req, res) => {
 		try {
 			const errors = validationResult(req);
-			if (!errors.isEmpty()) {
-				return apiResponse.validationErrorWithData(res, "Validation Error.", errors.array());
-			}else {
-				var query = {email : req.body.email};
+			if (!errors.isEmpty()) { return apiResponse.validationErrorWithData(res, "Validation Error.", errors.array()); }
+				var query = { email : req.body.email };
 				UserModel.findOne(query).then(user => {
-					if (user) {
-						//Check already confirm or not.
-						if(!user.isConfirmed){
-							// Generate otp
-							let otp = utility.randomNumber(4);
-							// Html email body
-							let html = "<p>Please Confirm your Account.</p><p>OTP: "+otp+"</p>";
-							// Send confirmation email
-							mailer.send(
-								constants.confirmEmails.from, 
-								req.body.email,
-								"Confirm Account",
-								html
-							).then(function(){
-								user.isConfirmed = 0;
-								user.confirmOTP = otp;
-								// Save user.
-								user.save(function (err) {
-									if (err) { return apiResponse.ErrorResponse(res, err); }
-									return apiResponse.successResponse(res,"Confirm otp sent.");
-								});
-							});
-						}else{
-							return apiResponse.unauthorizedResponse(res, "Account already confirmed.");
-						}
-					}else{
-						return apiResponse.unauthorizedResponse(res, "Specified email not found.");
-					}
+          if(!user) { return apiResponse.unauthorizedResponse(res, "Email não encontrado."); }
+          if(user.isConfirmed){ return apiResponse.unauthorizedResponse(res, "Conta já confirmada."); }
+					let otp = utility.randomNumber(4);
+					let html = "<p>Please Confirm your Account.</p><p>OTP: "+otp+"</p>";
+					mailer.send(constants.confirmEmails.from, req.body.email, "Conta confirmada", html)
+            .then(function(){
+              user.isConfirmed = 0;
+              user.confirmOTP = otp;
+              user.save(function (err) {
+                if (err) { return apiResponse.ErrorResponse(res, err); }
+                return apiResponse.successResponse(res,"Conta confirmada.");
+              });
+            });
 				});
-			}
-		} catch (err) {
-			return apiResponse.ErrorResponse(res, err);
-		}
+		} catch (err) { return apiResponse.ErrorResponse(res, err); }
 	}];
