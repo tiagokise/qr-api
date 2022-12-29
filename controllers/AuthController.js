@@ -18,7 +18,7 @@ const { constants } = require("../helpers/constants");
  * @returns {Object}
  */
 
-exports.register = [
+exports.signup = [
 	body("userFullName")
 		.isLength({ min: 3 }).trim().withMessage("Nome completo é obrigatório."),
 
