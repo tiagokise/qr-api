@@ -35,7 +35,8 @@ exports.register = [
     .isLength({ min: 11 }).trim().withMessage("Telefone é obrigatório.")
     .isNumeric().withMessage("Por favor insira um telefone válido."),
 
-	body("password").isLength({ min: 6 }).trim().withMessage("A Senha deve ter no minímo 6 caracteres."),
+	body("password")
+    .isLength({ min: 6 }).trim().withMessage("A Senha deve ter no minímo 6 caracteres."),
 
 	sanitizeBody("userFullName").escape(),
 	sanitizeBody("email").escape(),
@@ -55,9 +56,9 @@ exports.register = [
           password: hash, 
           confirmOTP: otp 
         });
-        user.save(function (err) {
+        user.save((err) => {
           if (err) { return apiResponse.ErrorResponse(res, err); }
-          let userData = { _id: user._id, userFullName: user.userFullName, email: user.email };
+          let userData = { _id: user._id, userFullName: user.userFullName, phone: user.phone, email: user.email };
           return apiResponse.successResponseWithData(res,"Registration Success.", userData);
         });
         // let html = "<p>Por favor comfirme seu email.</p><p>Código: "+otp+"</p>";
@@ -71,119 +72,79 @@ exports.register = [
     } catch (err) { return apiResponse.ErrorResponse(res, err); }
 	}];
 
+
 /**
  * User login.
- *
- * @param {string}      email
- * @param {string}      password
+ * @param {string} email
+ * @param {string} password
  *
  * @returns {Object}
  */
+
 exports.login = [
-	body("email").isLength({ min: 1 }).trim().withMessage("Email must be specified.")
+	body("email")
+    .isLength({ min: 1 }).trim().withMessage("Email must be specified.")
 		.isEmail().withMessage("Email must be a valid email address."),
-	body("password").isLength({ min: 1 }).trim().withMessage("Password must be specified."),
+
+	body("password")
+    .isLength({ min: 1 }).trim().withMessage("Password must be specified."),
+
 	sanitizeBody("email").escape(),
 	sanitizeBody("password").escape(),
+
 	(req, res) => {
 		try {
 			const errors = validationResult(req);
-			if (!errors.isEmpty()) {
-				return apiResponse.validationErrorWithData(res, "Validation Error.", errors.array());
-			}else {
-				UserModel.findOne({email : req.body.email}).then(user => {
-					if (user) {
-						//Compare given password with db's hash.
-						bcrypt.compare(req.body.password,user.password,function (err,same) {
-							if(same){
-								//Check account confirmation.
-								if(user.isConfirmed){
-									// Check User's account active or not.
-									if(user.status) {
-										let userData = {
-											_id: user._id,
-											firstName: user.firstName,
-											lastName: user.lastName,
-											email: user.email,
-										};
-										//Prepare JWT token for authentication
-										const jwtPayload = userData;
-										const jwtData = {
-											expiresIn: process.env.JWT_TIMEOUT_DURATION,
-										};
-										const secret = process.env.JWT_SECRET;
-										//Generated JWT token with Payload and secret.
-										userData.token = jwt.sign(jwtPayload, secret, jwtData);
-										return apiResponse.successResponseWithData(res,"Login Success.", userData);
-									}else {
-										return apiResponse.unauthorizedResponse(res, "Account is not active. Please contact admin.");
-									}
-								}else{
-									return apiResponse.unauthorizedResponse(res, "Account is not confirmed. Please confirm your account.");
-								}
-							}else{
-								return apiResponse.unauthorizedResponse(res, "Email or Password wrong.");
-							}
-						});
-					}else{
-						return apiResponse.unauthorizedResponse(res, "Email or Password wrong.");
-					}
-				});
-			}
-		} catch (err) {
-			return apiResponse.ErrorResponse(res, err);
-		}
+			if (!errors.isEmpty()) { return apiResponse.validationErrorWithData(res, "Validation Error.", errors.array()); }; 
+			UserModel.findOne({email : req.body.email}).then(user => {
+        if(!user) { return apiResponse.notFoundResponse(res, "Houve um problema, verifique seu email e senha e tente novamente!"); }
+        bcrypt.compare(req.body.password,user.password, (err, same) => {
+          if(!same) { return apiResponse.unauthorizedResponse(res, "Houve um problema, verifique seu email e senha e tente novamente!"); }
+          if(!user.isConfirmed) { return apiResponse.unauthorizedResponse(res, "Por favor confirme seu email."); }
+          if(!user.status) { return apiResponse.unauthorizedResponse(res, "Sua conta está desativada, por favor entre em contato com o administrador."); }
+          let userData = { _id: user._id, userFullName: user.userFullName, email: user.email };
+          const jwtPayload = userData;
+          const jwtData = { expiresIn: process.env.JWT_TIMEOUT_DURATION };
+          const secret = process.env.JWT_SECRET;
+          userData.token = jwt.sign(jwtPayload, secret, jwtData);
+          return apiResponse.successResponseWithData(res,"Login Success.", userData);
+        });
+      });
+		} catch (err) { return apiResponse.ErrorResponse(res, err); }
 	}];
 
 /**
  * Verify Confirm otp.
- *
- * @param {string}      email
- * @param {string}      otp
+ * @param {string} email
+ * @param {string} otp
  *
  * @returns {Object}
  */
+
 exports.verifyConfirm = [
-	body("email").isLength({ min: 1 }).trim().withMessage("Email must be specified.")
+	body("email")
+    .isLength({ min: 1 }).trim().withMessage("Email must be specified.")
 		.isEmail().withMessage("Email must be a valid email address."),
-	body("otp").isLength({ min: 1 }).trim().withMessage("OTP must be specified."),
+	body("otp"
+    ).isLength({ min: 1 }).trim().withMessage("OTP must be specified."),
+
 	sanitizeBody("email").escape(),
 	sanitizeBody("otp").escape(),
+
 	(req, res) => {
 		try {
 			const errors = validationResult(req);
-			if (!errors.isEmpty()) {
-				return apiResponse.validationErrorWithData(res, "Validation Error.", errors.array());
-			}else {
-				var query = {email : req.body.email};
-				UserModel.findOne(query).then(user => {
-					if (user) {
-						//Check already confirm or not.
-						if(!user.isConfirmed){
-							//Check account confirmation.
-							if(user.confirmOTP == req.body.otp){
-								//Update user as confirmed
-								UserModel.findOneAndUpdate(query, {
-									isConfirmed: 1,
-									confirmOTP: null 
-								}).catch(err => {
-									return apiResponse.ErrorResponse(res, err);
-								});
-								return apiResponse.successResponse(res,"Account confirmed success.");
-							}else{
-								return apiResponse.unauthorizedResponse(res, "Otp does not match");
-							}
-						}else{
-							return apiResponse.unauthorizedResponse(res, "Account already confirmed.");
-						}
-					}else{
-						return apiResponse.unauthorizedResponse(res, "Specified email not found.");
-					}
-				});
-			}
-		} catch (err) {
-			return apiResponse.ErrorResponse(res, err);
-		}
+			if (!errors.isEmpty()) { return apiResponse.validationErrorWithData(res, "Validation Error.", errors.array()); }
+			var query = { email : req.body.email };
+			UserModel.findOne(query).then(user => {
+        if(!user) { return apiResponse.unauthorizedResponse(res, "Email não encontrado.") }
+				if(user.isConfirmed){return apiResponse.unauthorizedResponse(res, "Conta já confirmada."); }
+				if(user.confirmOTP !== req.body.otp) { return apiResponse.unauthorizedResponse(res, "Otp does not match"); }
+				UserModel.findOneAndUpdate(query, { isConfirmed: true, confirmOTP: null })
+          .catch(err => { return apiResponse.ErrorResponse(res, err); });
+				return apiResponse.successResponse(res,"Account confirmed success.");			
+			});
+		} catch (err) { return apiResponse.ErrorResponse(res, err); }
 	}];
 
 /**
