@@ -18,7 +18,7 @@ const { constants } = require("../helpers/constants");
  * @returns {Object}
  */
 
-exports.signUp = [
+exports.signup = [
 	body("userFullName")
 		.isLength({ min: 3 }).trim().withMessage("Nome completo é obrigatório."),
 
@@ -85,7 +85,7 @@ exports.login = [
 	(req, res) => {
 		try {
 			const errors = validationResult(req);
-			if (!errors.isEmpty()) { return apiResponse.validationErrorWithData(res, "Validation Error.", errors.array()); }; 
+			if (!errors.isEmpty()) { return apiResponse.validationErrorWithData(res, "Validation Error.", errors.array()); }
 			UserModel.findOne({email : req.body.email}).then(user => {
         if(!user) { return apiResponse.notFoundResponse(res, "Houve um problema, verifique seu email e senha e tente novamente!"); }
         bcrypt.compare(req.body.password,user.password, (err, same) => {
@@ -127,7 +127,7 @@ exports.verifyConfirm = [
 			if (!errors.isEmpty()) { return apiResponse.validationErrorWithData(res, "Validation Error.", errors.array()); }
 			var query = { email : req.body.email };
 			UserModel.findOne(query).then(user => {
-        if(!user) { return apiResponse.unauthorizedResponse(res, "Email não encontrado.") }
+        if(!user) { return apiResponse.unauthorizedResponse(res, "Email não encontrado."); }
 				if(user.isConfirmed){return apiResponse.unauthorizedResponse(res, "Conta já confirmada."); }
 				if(user.confirmOTP !== req.body.otp) { return apiResponse.unauthorizedResponse(res, "O código não é válido!"); }
 				UserModel.findOneAndUpdate(query, { isConfirmed: true, confirmOTP: null })
@@ -154,13 +154,13 @@ exports.resendConfirmOtp = [
 	(req, res) => {
 		try {
 			const errors = validationResult(req);
-			if (!errors.isEmpty()) { return apiResponse.validationErrorWithData(res, "Validation Error.", errors.array()); }
+			if (!errors.isEmpty()) { return apiResponse.validationErrorWithData(res, "Erro de validação.", errors.array()); }
 				var query = { email : req.body.email };
 				UserModel.findOne(query).then(user => {
           if(!user) { return apiResponse.unauthorizedResponse(res, "Email não encontrado."); }
           if(user.isConfirmed){ return apiResponse.unauthorizedResponse(res, "Conta já confirmada."); }
 					let otp = utility.randomNumber(4);
-					let html = "<p>Please Confirm your Account.</p><p>OTP: "+otp+"</p>";
+					let html = "<p>Por favor confirme sua conta.</p><p>OTP: "+otp+"</p>";
 					mailer.send(constants.confirmEmails.from, req.body.email, "Conta confirmada", html)
             .then(function(){
               user.isConfirmed = 0;
